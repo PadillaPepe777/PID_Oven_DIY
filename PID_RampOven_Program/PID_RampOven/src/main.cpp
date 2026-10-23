@@ -298,6 +298,86 @@ void loop() {
       lcd.clear();
       lcd.setCursor(0, 0);
       lcd.print("Soak Mode Selected");
+
+      TemperatureDisplay(temperature);
+
+      while(1)
+      {
+        cambio=leerEncoder();
+        temperature += cambio; // Adjust the temperature based on encoder input
+        if(temperature < 24) temperature = 24; // Prevent negative temperature
+
+        if(millis() - dispTime >= 500) {
+        TemperatureDisplay(temperature);
+        dispTime = millis(); // Reset the display timer
+        }
+
+        if(DebounceButton()); // Check for button press to exit the loop
+        break;
+      }
+
+      delay(100);
+
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("Baking Time: ");
+      SelectTimeDisplay(minutes_stay);
+
+      while(1){
+        cambio=leerEncoder();
+        minutes_stay += cambio; // Adjust the minutes based on encoder input
+        if(minutes_stay < 0) minutes_stay = 0; // Prevent negative time
+
+        if(millis() - dispTime >= 150) {
+        SelectTimeDisplay(minutes_stay);
+        dispTime = millis(); // Reset the display timer
+        }
+
+        if(DebounceButton()); // Check for button press to exit the loop
+        break;
+      }
+
+            lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("Config Completed");
+      lcd.setCursor(0, 1);
+      lcd.print("Soak Period Starting");
+      delay(1500);
+      lcd.clear();
+
+      runTime=millis(); // Reset the run time for the soak period
+
+      while((millis() - runTime) < (unsigned long)(minutes_stay * 60000)) {
+
+        if((millis() - dispTime) >= 700) {
+          dispTime = millis(); // Reset the display timer
+          RemainingTime(((millis() - runTime)/60000), minutes_stay);
+        }
+
+        actualTemperature=readTemperature(); // Read the actual temperature from the sensor
+        PID(millis(), temperature);
+        delay(100); // Delay to avoid overwhelming the loop
+        
+      }
+
+      delay(1000);
+      Serial.println("Finished!");
+
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("Finished!");
+      lcd.setCursor(0, 1);
+      lcd.print("Enjoy :)");
+
+
+      break;
+
+    case 1:
+      Serial.println("Ramp Mode Selected");
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("Ramp Mode Selected");
+
       TemperatureDisplay(temperature);
 
       while(1)
@@ -373,10 +453,10 @@ void loop() {
 
       while((millis() - runTime) < (unsigned long)(minutes_ramp * 60000)) {
 
-        if((millis() - dispTime) >= 700) {
+        if((millis() - dispTime) >= 700) { //Update User Display Information and setpoint
           dispTime = millis(); // Reset the display timer
-          Ramp_SetPoint();
-          RemainingTime(((millis() - runTime)/60000), minutes_ramp);
+          Ramp_SetPoint(); //Change Setpoint (needed for ramp)
+          RemainingTime(((millis() - runTime)/60000), minutes_ramp); //Show atual time and what are we reaching
         }
 
         actualTemperature=readTemperature(); // Read the actual temperature from the sensor
@@ -386,13 +466,14 @@ void loop() {
       }
       
       delay(1000); // Wait for a second before starting the soak period
+      noInterrupts();
 
       //Ramp period completed, now enter the soak period
       Serial.println("Soak Period Starting");
 
       lcd.clear();
       lcd.setCursor(0, 0);
-      lcd.print("Ramp Complete");
+      lcd.print("Ramp Completed");
       lcd.setCursor(0, 1);
       lcd.print("Soak Period Starting");
       delay(1500);
@@ -423,16 +504,10 @@ void loop() {
       lcd.print("Enjoy :)");
 
       break;
-
-    case 1:
-      Serial.println("Ramp Mode Selected");
-      lcd.clear();
-      lcd.setCursor(0, 0);
-      lcd.print("Ramp Mode Selected");
-      break;
   }
 
+
+  modeSelected=false;
+  return;
+
 }
-
-
-
