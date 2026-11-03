@@ -6,7 +6,6 @@
 
 #include <max6675.h>
 
-
 #define Select_Button 6
 #define RIGHT_BUTTON 11
 #define LEFT_BUTTON 8
@@ -22,6 +21,8 @@
 #define S0 12
 #define CS 10
 #define SCK 13
+
+#define Buzzer 9
 
 
 LiquidCrystal_I2C lcd(0x27, 16, 2); // Initialize the LCD with the I2C address and dimensions
@@ -159,6 +160,16 @@ void TemperatureDisplay(int temperature) {
       lcd.print(temperature, 1); // Display the temperature with one decimal place
 }
 
+void BothTemperature(float actualTemperature, int setTemperature) {
+      lcd.setCursor(0, 1);
+      lcd.print("Temp C: ");
+
+      lcd.setCursor(8, 1);
+      lcd.print(actualTemperature, 0); // Display the temperature with no decimal place
+      lcd.print("->");
+      lcd.print(setTemperature, 0); // Display the set temperature with no decimal place
+}
+
 void SelectTimeDisplay(int desiredTime) {
       lcd.setCursor(0, 1);
       lcd.print("T HH:MM: ");
@@ -182,7 +193,7 @@ void RemainingTime(int ActualTime, int TotalTime) {
 
       int hours = 0; // Reset hours to 0 before calculation
       int minutes = TotalTime; // Reset minutes to 0 before calculation
-      lcd.setCursor(0, 8);
+      lcd.setCursor(0, 11);
 
       if (TotalTime >60) {
         hours = TotalTime / 60;
@@ -194,7 +205,7 @@ void RemainingTime(int ActualTime, int TotalTime) {
 
       int hours2 = 0; // Reset hours to 0 before calculation
       int minutes2 = ActualTime; // Reset minutes to 0 before calculation
-      lcd.setCursor(0, 8);
+      lcd.setCursor(0, 5);
 
       if (ActualTime >60) {
         hours2 = ActualTime / 60;
@@ -239,6 +250,16 @@ if(!digitalRead(Select_Button) && prevSB==false) { // If the select button is pr
       return tempC;
     }
 
+void FlashBuzzer() {
+  digitalWrite(Buzzer, HIGH);
+  delay(100);
+  digitalWrite(Buzzer, LOW);
+  delay(100);
+  digitalWrite(Buzzer, HIGH);
+  delay(100);
+  digitalWrite(Buzzer, LOW);
+}
+
 void setup() {
   Serial.begin(9600);
   delay(500);
@@ -255,6 +276,7 @@ void setup() {
   pinMode(OUTB, INPUT);
   pinMode(TRIAC_OUT, OUTPUT);
   pinMode(AC_IN, INPUT_PULLUP);
+  pinMode(Buzzer, OUTPUT);
 
   attachInterrupt(digitalPinToInterrupt(AC_IN), Triac_Control, CHANGE);
 
@@ -278,6 +300,7 @@ void loop() {
 
   cambio=leerEncoder();
   currentMode = (currentMode + cambio + 2) % 2; // Ensure currentMode stays within 0 and 1
+  //+2 so that if currentMode is 0 and cambio is -1, it will wrap around to 1 instead of going negative
 
   if(millis() - dispTime >= 500) {
     isBlinking = !isBlinking; // Toggle the blinking state
@@ -289,6 +312,8 @@ void loop() {
 
 
   } //end Mode Selection Loop
+
+  FlashBuzzer();
 
   delay(100);
 
@@ -316,6 +341,8 @@ void loop() {
         break;
       }
 
+      FlashBuzzer();
+
       delay(100);
 
       lcd.clear();
@@ -337,7 +364,9 @@ void loop() {
         break;
       }
 
-            lcd.clear();
+      FlashBuzzer();
+
+      lcd.clear();
       lcd.setCursor(0, 0);
       lcd.print("Config Completed");
       lcd.setCursor(0, 1);
@@ -346,12 +375,14 @@ void loop() {
       lcd.clear();
 
       runTime=millis(); // Reset the run time for the soak period
+      interrupts();
 
       while((millis() - runTime) < (unsigned long)(minutes_stay * 60000)) {
 
         if((millis() - dispTime) >= 700) {
           dispTime = millis(); // Reset the display timer
           RemainingTime(((millis() - runTime)/60000), minutes_stay);
+          BothTemperature(actualTemperature, temperature); // Show the actual temperature on the display
         }
 
         actualTemperature=readTemperature(); // Read the actual temperature from the sensor
@@ -362,12 +393,15 @@ void loop() {
 
       delay(1000);
       Serial.println("Finished!");
+      FlashBuzzer();
 
       lcd.clear();
       lcd.setCursor(0, 0);
       lcd.print("Finished!");
       lcd.setCursor(0, 1);
       lcd.print("Enjoy :)");
+      
+      delay(2500);
 
 
       break;
@@ -395,6 +429,8 @@ void loop() {
         break;
       }
       delay(100);
+      FlashBuzzer();
+
 
       lcd.clear();
       lcd.setCursor(0, 0);
@@ -417,6 +453,9 @@ void loop() {
 
       delay(100);
 
+      FlashBuzzer();
+
+
       lcd.clear();
       lcd.setCursor(0, 0);
       lcd.print("Baking Time: ");
@@ -436,6 +475,7 @@ void loop() {
         break;
       }
 
+      FlashBuzzer();
 
 
       actualTemperature=readTemperature(); // Read the actual temperature from the sensor
@@ -457,6 +497,8 @@ void loop() {
           dispTime = millis(); // Reset the display timer
           Ramp_SetPoint(); //Change Setpoint (needed for ramp)
           RemainingTime(((millis() - runTime)/60000), minutes_ramp); //Show atual time and what are we reaching
+          BothTemperature(actualTemperature, int(movingSetPoint)); // Show the actual temperature on the display
+
         }
 
         actualTemperature=readTemperature(); // Read the actual temperature from the sensor
@@ -486,6 +528,7 @@ void loop() {
         if((millis() - dispTime) >= 700) {
           dispTime = millis(); // Reset the display timer
           RemainingTime(((millis() - runTime)/60000), minutes_stay);
+          BothTemperature(actualTemperature, temperature); // Show the actual temperature on the display
         }
 
         actualTemperature=readTemperature(); // Read the actual temperature from the sensor
@@ -496,12 +539,15 @@ void loop() {
 
       delay(1000);
       Serial.println("Finished!");
+      FlashBuzzer();
 
       lcd.clear();
       lcd.setCursor(0, 0);
       lcd.print("Finished!");
       lcd.setCursor(0, 1);
       lcd.print("Enjoy :)");
+
+      delay(2500);
 
       break;
   }
