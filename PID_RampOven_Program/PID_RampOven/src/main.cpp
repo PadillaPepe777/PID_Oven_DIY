@@ -10,22 +10,24 @@
 #define RIGHT_BUTTON 11
 #define LEFT_BUTTON 8
 
-#define EncButton 3
-#define OUTA 4  //CLK
-#define OUTB 5  //DT
+#define EncButton A0
+#define OUTB A1  //DT
+#define OUTA A2  //CLK
 
 #define AC_IN 2
 #define TRIAC_OUT 7
 
 //Max6675
 #define S0 12
-#define CS 10
+#define CS1 10
+#define CS2 9
 #define SCK 13
 
-#define Buzzer 9
+#define Buzzer 5
 
 LiquidCrystal_I2C lcd(0x27, 16, 2); // Initialize the LCD with the I2C address and dimensions
-MAX6675 thermocouple(SCK, CS, S0);
+MAX6675 thermocouple(SCK, CS1, S0);
+//MAX6675 thermocouple(SCK, CS2, S0); //Second Max6675 sensor, if needed have to change code...
 
 bool isBlinking = false; // Variable to control blinking state
 int currentMode = 0; // 0 for Soak, 1 for Ramp
