@@ -24,7 +24,6 @@
 
 #define Buzzer 9
 
-
 LiquidCrystal_I2C lcd(0x27, 16, 2); // Initialize the LCD with the I2C address and dimensions
 MAX6675 thermocouple(SCK, CS, S0);
 
