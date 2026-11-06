@@ -1,3 +1,4 @@
+#include "config.h"
 #include <Arduino.h>
 
 #include <Wire.h> 
@@ -6,28 +7,11 @@
 
 #include <max6675.h>
 
-#define Select_Button 6
-#define RIGHT_BUTTON 11
-#define LEFT_BUTTON 8
 
-#define EncButton A0
-#define OUTB A1  //DT
-#define OUTA A2  //CLK
-
-#define AC_IN 2
-#define TRIAC_OUT 7
-
-//Max6675
-#define S0 12
-#define CS1 10
-#define CS2 9
-#define SCK 13
-
-#define Buzzer 5
 
 LiquidCrystal_I2C lcd(0x27, 16, 2); // Initialize the LCD with the I2C address and dimensions
-MAX6675 thermocouple(SCK, CS1, S0);
-//MAX6675 thermocouple(SCK, CS2, S0); //Second Max6675 sensor, if needed have to change code...
+MAX6675 thermocouple(CLK, CS1, S0);
+//MAX6675 thermocouple(CLK, CS2, S0); //Second Max6675 sensor, if needed have to change code...
 
 bool isBlinking = false; // Variable to control blinking state
 int currentMode = 0; // 0 for Soak, 1 for Ramp
@@ -72,6 +56,7 @@ float deltaTime = (ActTime - lastTime);
 
   firingAngle = map(output, 0, 255, 8333, 0); // Map the output to a firing angle in microseconds (for 60Hz AC)
   //  16.67ms / 2 = 8.33ms = 8333us
+  //delay time for triac --> 0 = 100% capacity, 8333 = 0% capacity
   
   if (firingAngle > 8333) firingAngle = 8333;
   if (firingAngle < 0) firingAngle = 0;
@@ -105,24 +90,18 @@ void Ramp_SetPoint(){
 
 void Triac_Control() {
 
-  // Desactivar interrupciones brevemente para evitar rebotes
+  // Deactivate interrupts to prevent nested interrupts
   noInterrupts();
   
-  // Encender el MOC3021 inmediatamente o con un pequeño delay de seguridad
-  // (El MOC3021 es de disparo aleatorio, pero para control de fase, 
-  // queremos disparar en el ángulo correcto, no aleatorio. 
-  // Nota: El MOC3021 es "Random Phase", el MOC3023 es "Zero Cross". 
-  // Para control de fase, el MOC3021 está bien si lo disparas manualmente).
-  
-  // Esperar el ángulo calculado por el PID
+  //Wait for the firing angle delay
   delayMicroseconds(output);
   
   // Disparar el TRIAC
   digitalWrite(TRIAC_OUT, HIGH);
-  delayMicroseconds(10); // Pulso de 10us es suficiente para el MOC3021
+  delayMicroseconds(10); //10us pulse is enough for MOC3021
   digitalWrite(TRIAC_OUT, LOW);
   
-  interrupts();
+  interrupts(); //Interrupts are re-enabled at the end of the ISR
 }
 
 void updateDisplay() {
@@ -399,8 +378,6 @@ void loop() {
       lcd.clear();
       lcd.setCursor(0, 0);
       lcd.print("Finished!");
-      lcd.setCursor(0, 1);
-      lcd.print("Enjoy :)");
       
       delay(2500);
 
@@ -498,7 +475,7 @@ void loop() {
           dispTime = millis(); // Reset the display timer
           Ramp_SetPoint(); //Change Setpoint (needed for ramp)
           RemainingTime(((millis() - runTime)/60000), minutes_ramp); //Show atual time and what are we reaching
-          BothTemperature(actualTemperature, int(movingSetPoint)); // Show the actual temperature on the display
+          BothTemperature(actualTemperature, int(movingSetPoint)); // Show the actual temperature on the display and Setpoint
 
         }
 
@@ -521,6 +498,8 @@ void loop() {
       lcd.print("Soak Period Starting");
       delay(1500);
       lcd.clear();
+
+      interrupts();
 
       runTime=millis(); // Reset the run time for the soak period
 
@@ -545,16 +524,22 @@ void loop() {
       lcd.clear();
       lcd.setCursor(0, 0);
       lcd.print("Finished!");
-      lcd.setCursor(0, 1);
-      lcd.print("Enjoy :)");
 
       delay(2500);
 
       break;
   }
 
-
   modeSelected=false;
+  noInterrupts();
+
+  while(!DebounceButton()) // Wait for the user to press the button before restarting the loop
+  {
+    delay(750);
+    actualTemperature=readTemperature();
+    TemperatureDisplay(temperature);
+  }
+  
   return;
 
 }
